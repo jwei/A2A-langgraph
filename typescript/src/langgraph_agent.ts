@@ -5,8 +5,9 @@
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { Annotation, StateGraph } from "@langchain/langgraph";
+import { Annotation, StateGraph, START, END } from "@langchain/langgraph";
 import { type BaseMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import "dotenv/config";
 
 /**
@@ -23,17 +24,21 @@ const MessagesState = Annotation.Root({
 
 type MessagesStateType = typeof MessagesState.State;
 
+// Initialize OpenAI client once (more efficient than creating on each call)
+const model = new ChatOpenAI({
+  model: "gpt-4o-mini",
+  temperature: 0.7,
+  maxTokens: 100,
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 /**
  * Process conversational messages and returns output using OpenAI.
  */
-async function callModel(state: MessagesStateType): Promise<Partial<MessagesStateType>> {
-  // Initialize OpenAI client
-  const model = new ChatOpenAI({
-    model: "gpt-4o-mini",
-    temperature: 0.7,
-    maxTokens: 100,
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+async function callModel(
+  state: MessagesStateType,
+  config?: RunnableConfig
+): Promise<Partial<MessagesStateType>> {
 
   // Get the latest user message
   const latestMessage = state.messages[state.messages.length - 1];
@@ -71,6 +76,6 @@ async function callModel(state: MessagesStateType): Promise<Partial<MessagesStat
 // Define the graph
 export const graph = new StateGraph(MessagesState)
   .addNode("callModel", callModel)
-  .addEdge("__start__", "callModel")
-  .addEdge("callModel", "__end__")
+  .addEdge(START, "callModel")
+  .addEdge("callModel", END)
   .compile();

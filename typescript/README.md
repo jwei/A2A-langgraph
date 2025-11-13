@@ -30,6 +30,10 @@ This project demonstrates an Agent-to-Agent (A2A) conversation using LangGraph w
    ```
    Copy the `assistant_id` from this output as well.
 
+   **Access API Documentation:**
+   - **LangGraph Studio**: The server output will show a Studio UI link (e.g., `https://smith.langchain.com/studio?baseUrl=http://localhost:2025`). This is the primary way to view API documentation, test endpoints, and visualize your graph in the TypeScript version.
+   - **Note**: The TypeScript LangGraph dev server does not expose a `/docs` endpoint like the Python version. Use LangGraph Studio for API exploration.
+
 3. **Configure the assistant IDs:**
    Add the following to your `.env` file:
    ```

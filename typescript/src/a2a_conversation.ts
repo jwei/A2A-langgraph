@@ -35,7 +35,7 @@ async function sendMessage(
   assistantId: string,
   text: string
 ): Promise<string> {
-  const url = `http://127.0.0.1:${port}/a2a/${assistantId}`;
+  const url = `http://localhost:${port}/a2a/${assistantId}`;
   const payload: A2AMessage = {
     jsonrpc: "2.0",
     id: "",
