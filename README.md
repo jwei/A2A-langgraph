@@ -1,6 +1,10 @@
 # Agent-to-Agent (A2A) Conversation with LangGraph
 
-This project demonstrates Agent-to-Agent (A2A) conversations using LangGraph with the A2A protocol. It includes implementations in both **Python** and **TypeScript**, allowing you to explore A2A communication patterns across different language ecosystems.
+This project demonstrates Agent-to-Agent (A2A) conversations using LangGraph with the A2A protocol. It now includes:
+
+- a **LangGraph Python** implementation
+- a **LangGraph TypeScript** implementation
+- a **Google A2A Python SDK** implementation
 
 ## Overview
 
@@ -14,12 +18,19 @@ The project showcases how two conversational AI agents can communicate with each
 
 ```
 agent2agent/
-├── python/                    # Python implementation
+├── python/                    # LangGraph Python implementation
 │   ├── langgraph_agent.py     # Agent definition
 │   ├── a2a_conversation.py   # Conversation orchestrator
 │   ├── langgraph.json         # LangGraph configuration
 │   ├── requirements.txt       # Python dependencies
 │   └── README.md              # Python-specific docs
+│
+├── google-a2a/                # Standard A2A Python SDK implementation
+│   ├── agent_server.py        # A2A server entrypoint
+│   ├── agent_executor.py      # AgentExecutor implementation
+│   ├── a2a_conversation.py    # SDK-based conversation orchestrator
+│   ├── requirements.txt       # Python dependencies
+│   └── README.md              # Google A2A-specific docs
 │
 ├── typescript/                 # TypeScript implementation
 │   ├── src/
@@ -66,6 +77,51 @@ agent2agent/
    ```
 
 See [python/README.md](python/README.md) for detailed Python setup instructions.
+
+### Google A2A Python SDK Implementation
+
+1. **Setup:**
+   ```bash
+   cd google-a2a
+   /opt/homebrew/bin/python3.11 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env.agent-a
+   cp .env.example .env.agent-b
+   ```
+   Set `OPENAI_API_KEY` in both files, then set:
+   - `.env.agent-a`: `PORT=21024`, `PUBLIC_BASE_URL=http://127.0.0.1:21024`, `AGENT_NAME=Agent A`
+   - `.env.agent-b`: `PORT=21025`, `PUBLIC_BASE_URL=http://127.0.0.1:21025`, `AGENT_NAME=Agent B`
+
+3. **Run agents:**
+   ```bash
+   # Terminal 1
+   set -a
+   source .env.agent-a
+   set +a
+   python agent_server.py
+
+   # Terminal 2
+   set -a
+   source .env.agent-b
+   set +a
+   python agent_server.py
+   ```
+
+4. **Run conversation:**
+   ```bash
+   # Terminal 3
+   set -a
+   source .env.agent-a
+   set +a
+   python a2a_conversation.py
+   ```
+
+See [google-a2a/README.md](google-a2a/README.md) for detailed setup and debugging notes.
 
 ### TypeScript Implementation
 
@@ -165,4 +221,3 @@ The orchestrator:
 ## License
 
 See [LICENSE](LICENSE) for details.
-
