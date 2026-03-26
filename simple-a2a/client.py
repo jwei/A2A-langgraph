@@ -43,11 +43,14 @@ async def fetch_agent_card(base_url: str, headers: dict[str, str]) -> dict[str, 
         return response.json()
 
 
-async def send_text(a2a_client: Any, text: str) -> str:
+async def send_text(a2a_client: Any, skill_id: str, text: str) -> str:
     message = create_text_message_object(content=text)
     latest_text = ""
 
-    async for event in a2a_client.send_message(message):
+    async for event in a2a_client.send_message(
+        message,
+        request_metadata={"skill_id": skill_id},
+    ):
         latest_text = extract_text(event)
 
     return latest_text
@@ -67,6 +70,8 @@ async def main() -> None:
     print(f"   Description: {card.get('description', 'N/A')}")
     print(f"   RPC URL: {card.get('url', 'N/A')}")
     print(f"   Skills: {len(card.get('skills', []))}")
+    for skill in card.get("skills", []):
+        print(f"      - {skill.get('id', 'N/A')}: {skill.get('name', 'N/A')}")
     print()
 
     print("2) Testing A2A message/send...")
@@ -84,13 +89,17 @@ async def main() -> None:
         )
 
         tests = [
-            "summarize Agent-to-Agent protocol allows standardized communication between assistants.",
-            "add 7 5",
-            "Hello from the client test.",
+            (
+                "summarize",
+                "Agent-to-Agent protocol allows standardized communication between assistants.",
+            ),
+            ("add", "7 5"),
+            ("echo", "Hello from the client test."),
         ]
 
-        for idx, text in enumerate(tests, start=1):
-            response = await send_text(a2a_client, text)
+        for idx, (skill_id, text) in enumerate(tests, start=1):
+            response = await send_text(a2a_client, skill_id, text)
+            print(f"   Test {idx} skill: {skill_id}")
             print(f"   Test {idx} input: {text}")
             print(f"   Test {idx} output: {response}")
             print()

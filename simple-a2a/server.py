@@ -6,6 +6,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import uvicorn
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -29,6 +30,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+SkillHandler = Callable[[str], str]
+
 
 class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
     """Simple bearer-token auth guard for all server routes."""
@@ -51,11 +54,26 @@ class AgentConfig:
 
 
 class SimpleAgentExecutor(AgentExecutor):
-    """Deterministic demo executor with summarize/add/echo behaviors."""
+    """Deterministic demo executor with explicit skill dispatch."""
+
+    def __init__(self) -> None:
+        """
+        Initialize the skill handler with a dictionary of available skills.
+
+        The _skills dictionary maps skill names to their corresponding handler methods:
+        - "summarize": Summarizes content using the _summarize method
+        - "add": Performs addition using the _add method
+        - "echo": Echoes input using the _echo method
+        """
+        self._skills: dict[str, SkillHandler] = {
+            "summarize": self._summarize,
+            "add": self._add,
+            "echo": self._echo,
+        }
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         user_text = context.get_user_input().strip()
-        response = self._handle(user_text)
+        response = self._dispatch(context.metadata, user_text)
 
         await event_queue.enqueue_event(
             new_agent_text_message(
@@ -68,27 +86,48 @@ class SimpleAgentExecutor(AgentExecutor):
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise NotImplementedError("Cancellation is not implemented for this demo server.")
 
-    def _handle(self, text: str) -> str:
+    def _dispatch(self, metadata: dict[str, object], text: str) -> str:
+        skill_id = metadata.get("skill_id")
+        if not isinstance(skill_id, str) or not skill_id.strip():
+            available = ", ".join(sorted(self._skills))
+            return (
+                "Missing request metadata 'skill_id'. "
+                f"Choose one of: {available}."
+            )
+
+        handler = self._skills.get(skill_id.strip().lower())
+        if handler is None:
+            available = ", ".join(sorted(self._skills))
+            return (
+                f"Unknown skill_id '{skill_id}'. "
+                f"Choose one of: {available}."
+            )
+
         if not text:
             return "I did not receive any text input."
 
-        lowered = text.lower()
-        if lowered.startswith("summarize "):
-            payload = text[len("summarize ") :].strip()
-            if not payload:
-                return "Provide text after 'summarize'."
-            return payload[:80] + ("..." if len(payload) > 80 else "")
+        return handler(text)
 
-        if lowered.startswith("add "):
-            parts = text.split()
-            if len(parts) == 3:
-                try:
-                    total = int(parts[1]) + int(parts[2])
-                    return f"{parts[1]} + {parts[2]} = {total}"
-                except ValueError:
-                    return "Use: add <int> <int>"
-            return "Use: add <int> <int>"
+    def _summarize(self, text: str) -> str:
+        payload = text.strip()
+        if not payload:
+            return "Provide text for summarize."
+        return payload[:80] + ("..." if len(payload) > 80 else "")
 
+    def _add(self, text: str) -> str:
+        parts = text.split()
+        if len(parts) != 2:
+            return "Use add skill input: <int> <int>"
+
+        try:
+            left = int(parts[0])
+            right = int(parts[1])
+        except ValueError:
+            return "Use add skill input: <int> <int>"
+
+        return f"{left} + {right} = {left + right}"
+
+    def _echo(self, text: str) -> str:
         return f"Echo: {text}"
 
 
@@ -96,7 +135,7 @@ def build_agent_card(base_url: str, config: AgentConfig) -> AgentCard:
     rpc_url = base_url.rstrip("/") + "/"
     return AgentCard(
         name=config.agent_name,
-        description="Minimal A2A demo agent supporting summarize/add/echo text commands.",
+        description="Minimal A2A demo agent exposing summarize, add, and echo skills.",
         url=rpc_url,
         version="1.0.0",
         default_input_modes=["text/plain"],
@@ -104,16 +143,28 @@ def build_agent_card(base_url: str, config: AgentConfig) -> AgentCard:
         capabilities=AgentCapabilities(streaming=False),
         skills=[
             AgentSkill(
-                id="demo-tools",
-                name="Demo Text Tools",
-                description="Commands: 'summarize <text>', 'add <a> <b>', or free-form echo.",
+                id="summarize",
+                name="Summarize",
+                description="Shortens input text to a brief summary preview.",
                 tags=["demo", "a2a", "text"],
                 examples=[
-                    "summarize This is a long message that should be shortened.",
-                    "add 7 5",
-                    "Hello there!",
+                    "Agent-to-Agent protocol allows standardized communication between assistants.",
                 ],
-            )
+            ),
+            AgentSkill(
+                id="add",
+                name="Add",
+                description="Adds two integers provided in the input text.",
+                tags=["demo", "a2a", "math"],
+                examples=["7 5"],
+            ),
+            AgentSkill(
+                id="echo",
+                name="Echo",
+                description="Returns the input text unchanged except for an 'Echo:' prefix.",
+                tags=["demo", "a2a", "text"],
+                examples=["Hello there!"],
+            ),
         ],
     )
 
